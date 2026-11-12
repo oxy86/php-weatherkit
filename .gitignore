@@ -3,7 +3,9 @@ composer.lock
 # credentials and local config — never commit
 *.p8
 *.key
+examples/config.php
 examples/settings.php
 settings.php
 # example output
 examples/exported_data/
+.phpunit.result.cache

@@ -3,7 +3,6 @@
 namespace Oxy86\PhpWeatherKit;
 
 use InvalidArgumentException;
-use Oxy86\PhpWeatherKit\Utility\DebugUtils;
 
 /**
  * Get an item from the array by its key.
@@ -52,7 +51,7 @@ function json_decode($json, $assoc = false, $depth = 512, $options = 0)
  * @see WMO icons: https://worldweather.wmo.int/en/wxicons.html
  * @see Apple icons: https://support.apple.com/guide/iphone/learn-the-weather-icons-iph4305794fb/ios
  */
-function conditionCodeToIconName(string $condition_text = null)
+function conditionCodeToIconName(?string $condition_text = null)
 {
     $icon_name = 'unknown';
     switch ($condition_text) {

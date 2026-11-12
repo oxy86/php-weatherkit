@@ -3,7 +3,6 @@
 namespace Oxy86\PhpWeatherKit\Http;
 
 use Oxy86\PhpWeatherKit\Parameters;
-use Oxy86\PhpWeatherKit\Utility\DebugUtils;
 
 
 
@@ -29,9 +28,8 @@ class RequestFactory
      * 
      * @return void
      */
-    public function __construct(string $jwt = null)
+    public function __construct(?string $jwt = null)
     {
-        DebugUtils::e(__METHOD__, "Reading JWT token...");
         $this->jwt = $jwt;
     }
 
@@ -44,14 +42,11 @@ class RequestFactory
     public function createForecastRequest(Parameters $parameters)
     {
 
-        DebugUtils::e(__METHOD__, "Generating forecast request url from parameters...");
         $url = $this->generateForecastUrl($parameters);
 
-        DebugUtils::e(__METHOD__, "Building forecast request url query from parameters...");
         $query = $this->buildQuery($parameters);
 
         if ($url instanceof Url) {
-            DebugUtils::e(__METHOD__, "Will create just one request...");
             return $this->createRequest($url, $query);
         }
 
@@ -124,7 +119,6 @@ class RequestFactory
 
         $query = http_build_query($data_for_query);
 
-        DebugUtils::e(__METHOD__, "query: " . $query );
 
         return urldecode($query);
     }
@@ -140,7 +134,6 @@ class RequestFactory
      */
     protected function createRequest(Url $url, $query)
     {
-        DebugUtils::e(__METHOD__, "Creating new Request to url: " . $url->value());
         // Create a request id using ms from unix epoch time
         $id = microtime(true);
         // Create the new Request passing the id, the query, and the JWT credentials

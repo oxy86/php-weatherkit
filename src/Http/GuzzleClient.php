@@ -5,7 +5,6 @@ namespace Oxy86\PhpWeatherKit\Http;
 use Oxy86\PhpWeatherKit\Http\Request;
 use GuzzleHttp\Client as Guzzle;
 use GuzzleHttp\Promise\Utils;
-use Oxy86\PhpWeatherKit\Utility\DebugUtils;
 
 
 /**
@@ -26,9 +25,8 @@ class GuzzleClient
      * @param  \GuzzleHttp\Client|null  $client
      * @return void
      */
-    public function __construct(Guzzle $client = null)
+    public function __construct(?Guzzle $client = null)
     {
-        DebugUtils::e(__METHOD__, "Constructing...");
         $this->client = isset($client) ? $client : new Guzzle;
     }
 
@@ -56,7 +54,6 @@ class GuzzleClient
      */
     public function request(Request $request)
     {
-        DebugUtils::e(__METHOD__, "Making the actual request to Weatherkit API to obtain weather data..." );
         return $this->client->get($request->url(), $this->options($request));
     }
 
@@ -86,7 +83,6 @@ class GuzzleClient
      */
     protected function composePromises(array $requests)
     {
-        DebugUtils::e(__METHOD__, "Composing promises...");
         $promises = [];
 
         array_walk($requests, function (Request $request) use (&$promises) {

@@ -6,20 +6,21 @@ Goal: take PhpWeatherKit from a working, site-derived library (**0.1**, alpha) t
 Blocks announcing the package.
 
 ### Quality
-- [ ] PHPUnit test suite with recorded WeatherKit JSON fixtures (no network, no credentials in CI)
+- [x] PHPUnit set up (`composer test`-style: `vendor/bin/phpunit`); config, constructor, logger, JWT, export tests
+- [ ] Tests with recorded WeatherKit JSON fixtures for `WeatherData`/`DataBlock`/`DataPoint`/`Alert` and a mocked HTTP client (no network, no credentials in CI)
 - [ ] Unit tests for validation rules (coordinates, language, country code, timezone, datasets)
-- [ ] Unit tests for JWT generation (throwaway key generated in the test)
-- [ ] GitHub Actions: tests on PHP 8.1–8.4, `composer audit`, static analysis (PHPStan, start at level 5)
+- [x] Unit tests for JWT generation (throwaway key generated in the test)
+- [x] (workflow added, first run pending) GitHub Actions: tests on PHP 8.1–8.4, `composer audit`, static analysis (PHPStan, start at level 5)
 - [ ] Code style (PHP-CS-Fixer or PHPCS, PSR-12) enforced in CI
 
 ### API / design
-- [ ] **Configuration without `settings.php`**: constructor injection (`new PhpWeatherKit(Config::fromArray([...]))`); keep the settings file only as an optional loader. Remove the `Settings` singleton and `$GLOBALS['config']` coupling
-- [ ] Remove `DebugUtils` echo output; accept an optional PSR-3 logger instead
-- [ ] Stop reading the key file implicitly in several places; support a key passed as a string (e.g. from an env var / secret store)
+- [x] **Configuration without `settings.php`**: `new PhpWeatherKit([...])` / `Config`; legacy `settings.php` still loadable via a directory path. `Settings` singleton and `$GLOBALS['config']` removed (BREAKING vs 0.1)
+- [x] Removed `DebugUtils` echo output; optional PSR-3 logger injected instead
+- [x] Key can be passed as a string (`private_key`) or path (`private_key_path`), read in one place (`Config::privateKey()`)
 - [ ] Cache/reuse the JWT until shortly before expiry instead of regenerating it per instance
 - [ ] Typed exceptions (`ValidationException`, `AuthenticationException`, `RateLimitException`, `ApiException`) instead of generic `\Exception`/`RuntimeException`
 - [ ] Inject the HTTP client (PSR-18) so users can bring their own client/mock it; drop the hard Guzzle dependency if feasible
-- [ ] `declare(strict_types=1)`, native parameter/return types, remove legacy docblock-only typing
+- [ ] `declare(strict_types=1)` everywhere (done in `Config` only), native parameter/return types, remove legacy docblock-only typing
 - [ ] Remove dead Dark Sky leftovers (e.g. stale notes in `DataPoint`) and unused Laravel-style helpers
 - [ ] Review `src/functions.php` (`json_decode` override, `conditionCodeToIconName`): namespace-polluting global functions → move to classes
 - [ ] Support the WeatherKit `availability` endpoint and the `currentWeather` / `forecastDaily` units parameter; check API coverage against Apple's current reference
@@ -54,6 +55,7 @@ Blocks announcing the package.
 - Respond to issues; triage monthly
 
 ## Done
+- [x] 2026-11-12: Config class, PSR-3 logging, first PHPUnit tests (22 passing), live re-verification with string key
 - [x] MIT license with the original DarkSkyApi (Dmitry Ivanov) notice
 - [x] PHP ≥ 8.1, `firebase/php-jwt` ^7
 - [x] Generic examples (`examples/`), no site-specific data or credentials

@@ -5,12 +5,12 @@
  *
  * Setup:
  *   1. composer install   (from the repository root)
- *   2. cp examples/settings.php.sample examples/settings.php   and fill in your Apple credentials
+ *   2. cp examples/config.sample.php examples/config.php   and fill in your Apple credentials
  *   3. put your .p8 key where WEATHERKIT_PRIVATE_KEY_FILE_PATH points
  *   4. php examples/index.php
  *
  * For every location in locations.json it prints the current conditions and a short daily
- * forecast. If `export_dir` is set in settings.php it also writes one JSON file per location.
+ * forecast. If `export_dir` is set in the config it also writes one JSON file per location.
  */
 
 use Oxy86\PhpWeatherKit\PhpWeatherKit;
@@ -19,10 +19,9 @@ use function Oxy86\PhpWeatherKit\conditionCodeToIconName;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
-// The directory that contains settings.php.
-$api = new PhpWeatherKit(__DIR__);
+$api = new PhpWeatherKit(require __DIR__ . '/config.php');
 
-foreach ($api->getGeolocations() as $key => $location) {
+foreach ($api->getGeolocations() ?: [] as $key => $location) {
   if (empty($location['coords'][0]) || empty($location['coords'][1])) {
     fwrite(STDERR, "Skipping '$key': missing coordinates\n");
     continue;
@@ -34,7 +33,7 @@ foreach ($api->getGeolocations() as $key => $location) {
   }
   $name = $location['name'] ?? $code;
 
-  // Per-location values override the defaults from settings.php.
+  // Per-location values override the defaults from the configuration.
   $weather = $api->location($location['coords'][0], $location['coords'][1])
     ->language($location['language'] ?? $api->getParameters()->getLanguage())
     ->countryCode($location['country_code'] ?? $api->getParameters()->getCountryCode())

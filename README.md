@@ -15,7 +15,7 @@ A PHP library for [Apple's WeatherKit REST API](https://developer.apple.com/docu
 - Batch helper: read many locations from a JSON file and export results per location
 
 ## Requirements
-- PHP 8.1+ with `ext-json`, `ext-openssl`, cURL
+- PHP 8.1+ with `ext-json`, `ext-openssl`, cURL (PSR-3 logger optional)
 - An Apple Developer Program membership with a WeatherKit **Key ID**, **Team ID**, **Service ID** and the `.p8` private key ([how to create them](https://developer.apple.com/documentation/weatherkitrestapi/request_authentication_for_weatherkit_rest_api))
 
 ## Install
@@ -25,14 +25,23 @@ composer require oxy86/php-weatherkit
 (Until it is on Packagist, clone this repository and run `composer install`.)
 
 ## Quick start
-The library reads its configuration from a `settings.php` file located in the directory you pass to the constructor (see [`examples/settings.php.sample`](examples/settings.php.sample)).
+Configure the library with an array (or a `Config` object) — see [`examples/config.sample.php`](examples/config.sample.php) for all keys. The private key can be passed as a file path or as a string (e.g. from an environment variable).
 
 ```php
 use Oxy86\PhpWeatherKit\PhpWeatherKit;
 
 require 'vendor/autoload.php';
 
-$api = new PhpWeatherKit('/path/to/dir-containing-settings.php');
+$api = new PhpWeatherKit([
+    'team_id'          => 'YYYYYYYYYY',
+    'key_id'           => 'XXXXXXXXXX',
+    'service_id'       => 'com.example.weatherkit',
+    'private_key_path' => '/path/to/AuthKey_XXXXXXXXXX.p8',
+    'language'         => 'en',
+    'timezone'         => 'UTC',
+    'country_code'     => 'US',
+]);
+// Optional: pass any PSR-3 logger as 2nd argument to see debug messages.
 
 $weather = $api->location(51.5074, -0.1278)   // latitude, longitude
     ->language('en')
@@ -48,13 +57,13 @@ foreach ($weather->daily()->dataPoints() as $day) {
     echo substr($day->forecastStart(), 0, 10), ' ', $day->temperatureMin(), '–', $day->temperatureMax(), "\n";
 }
 ```
-Values you don't set fall back to the defaults in `settings.php`.
+Values you don't set per request fall back to the defaults in the configuration. (A legacy `settings.php` is still supported: pass the directory that contains it instead of an array.)
 
 ## Runnable example
 ```bash
 composer install
-cp examples/settings.php.sample examples/settings.php   # add your credentials
-cp /path/to/AuthKey_XXXXXXXXXX.p8 examples/             # or point settings.php to it
+cp examples/config.sample.php examples/config.php   # add your credentials
+cp /path/to/AuthKey_XXXXXXXXXX.p8 examples/         # or point 'private_key_path' to it
 php examples/index.php
 ```
 It prints current conditions and a 5-day forecast for the cities in [`examples/locations.json`](examples/locations.json) and, if `export_dir` is set, writes one JSON file per city.
@@ -70,9 +79,6 @@ Apple requires apps that show WeatherKit data to display the Apple Weather trade
 
 ## Contributing
 Issues and pull requests are welcome. Please read the [ROADMAP](ROADMAP.md) first — the open items (tests, CI, configuration API) are where help is most useful. Never include credentials in issues or PRs.
-
-## Security
-Never commit your `.p8` key or `settings.php`. The provided `.gitignore` excludes both.
 
 ## License & credits
 MIT — see [LICENSE.md](LICENSE.md). Large parts of this library derive from Dmitry Ivanov's [DarkSkyApi](https://github.com/dmitry-ivanov/dark-sky-api) (MIT), especially `src/Weather`, `src/Http` and `src/Validation`.

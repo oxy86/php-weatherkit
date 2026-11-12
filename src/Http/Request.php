@@ -2,7 +2,6 @@
 
 namespace Oxy86\PhpWeatherKit\Http;
 
-use Oxy86\PhpWeatherKit\Utility\DebugUtils;
 
 
 /**
@@ -56,7 +55,6 @@ class Request
         $this->query = $query;
         $this->jwt = $jwt;
 
-        DebugUtils::e(__METHOD__, "Constructed new Request, id: " . $id);
     }
 
     /**

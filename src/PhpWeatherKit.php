@@ -2,9 +2,8 @@
 
 namespace Oxy86\PhpWeatherKit;
 
-use Oxy86\PhpWeatherKit\Utility\DebugUtils;
-use Oxy86\PhpWeatherKit\Parameters;
-use Oxy86\PhpWeatherKit\Settings;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use Oxy86\PhpWeatherKit\Validation\Validator;
 use Oxy86\PhpWeatherKit\Http\RequestFactory;
 use Oxy86\PhpWeatherKit\Http\GuzzleClient;
@@ -23,11 +22,18 @@ class PhpWeatherKit
 {
 
     /**
-     * The app root, where the src code and the settings.php reside.
+     * The configuration.
      *
-     * @var string
+     * @var \Oxy86\PhpWeatherKit\Config
      */
-    protected $app_root;
+    protected $config;
+
+    /**
+     * The logger (a NullLogger unless one is injected).
+     *
+     * @var \Psr\Log\LoggerInterface
+     */
+    protected $logger;
 
     /**
      * The directory to export data
@@ -76,66 +82,44 @@ class PhpWeatherKit
 
 
     /**
-     * Constructs a new instance of the class
+     * Constructs a new instance of the class.
      *
-     * @param  string  $key
-     * @return void
+     * @param \Oxy86\PhpWeatherKit\Config|array|string $config
+     *   A Config object, an array of configuration values (see Config), or — for compatibility —
+     *   the path of a directory containing a legacy settings.php file.
+     * @param \Psr\Log\LoggerInterface|null $logger
+     *   Optional PSR-3 logger. Debug messages are sent to it; nothing is printed otherwise.
      */
-    public function __construct($app_root = NULL)
+    public function __construct($config, ?LoggerInterface $logger = null)
     {
-        //
-        // Set application root 
-        //
-        if ($app_root === NULL) {
-            $app_root = static::guessApplicationRoot();
+        $this->logger = $logger ?? new NullLogger();
+
+        if (is_array($config)) {
+            $config = Config::fromArray($config);
+        } elseif (is_string($config)) {
+            $config = Config::fromSettingsFile($config);
+        } elseif (!$config instanceof Config) {
+            throw new \InvalidArgumentException('The configuration must be a Config object, an array or a directory path.');
         }
-        $this->app_root = $app_root;
-        DebugUtils::e(__METHOD__, "app_root:" . $app_root);
+        $this->config = $config;
 
-        //
-        // Initialize settings
-        //
-        Settings::initialize($this->app_root);
-
-        //
-        // Create parameters container, validator, HTTP client and request factory
-        // 
-        DebugUtils::e(__METHOD__, "Create parameters object...");
         $this->parameters = new Parameters;
+        $this->applyDefaultParameters();
+        $this->applyExportDir();
+        $this->generateWeatherKitToken();
 
-        // Configure default request parameters
-        DebugUtils::e(__METHOD__, "Reading default request parameters from settings.php...");
-        $this->readDefaultParameterSettings();
-
-        // Check if there is a directory to export defined in settings.php
-        DebugUtils::e(__METHOD__, "Checking if there is an 'export_dir' defined in settings.php...");
-        $this->readExportDirSetting();
-
-        DebugUtils::e(__METHOD__, "Create validator...");
         $this->validator = new Validator;
-
-        DebugUtils::e(__METHOD__, "Create HTTP client...");
         $this->http_client = new GuzzleClient;
-
-        DebugUtils::e(__METHOD__, "Create RequestFactory...");
         $this->request_factory = new RequestFactory($this->parameters->getJWT());
+
+        $locations_file = $this->config->get('locations_file');
+        if (!empty($locations_file)) {
+            $this->logger->debug("Reading geolocations from '$locations_file'");
+            if (empty($this->readGeolocationsFile($locations_file))) {
+                throw new \RuntimeException("The locations file '$locations_file' is empty or invalid.");
+            }
+        }
     }
-
-
-    /**
-     * Determines the (absolute) application root directory based on this file's location. 
-     * 
-     * The application root directory is where all the source code of the application resides (in `src`), along with the `setting.php`
-     *
-     * @return string
-     *   The absolute path to the application root directory.
-     */
-    protected static function guessApplicationRoot()
-    {
-        return dirname(__DIR__);
-    }
-
-
 
 
     /**
@@ -152,220 +136,74 @@ class PhpWeatherKit
 
 
     /**
-     * Reads the default parameters (dataSets, dailyStart, hourlyStart, timezone, etc) from Settings.
-     * 
-     * @return bool
-     * 
+     * Applies the default request parameters from the configuration.
+     *
      * @see https://developer.apple.com/documentation/weatherkitrestapi/get_api_v1_weather_language_latitude_longitude#query-parameters
      */
-    private function readDefaultParameterSettings()
+    private function applyDefaultParameters(): void
     {
+        $c = $this->config;
+        $this->parameters->setLanguage($c->get('language'));
+        $this->parameters->setTimeZone($c->get('timezone'));
+        $this->parameters->setCountryCode($c->get('country_code'));
+        // All supported datasets are requested unless specific ones are configured.
+        $this->parameters->setDatasets($c->get('datasets') ?: Parameters::getSupportedDatasets());
 
-        //
-        // REQUIRED. Read the default language to use in the request path from WeatherKit REST API.
-        //
-        $language = Settings::get('default_language');
-        if (empty($language)) {
-            throw new \RuntimeException("Error! There is no 'default_language' key defined in settings.php. Check your settings file.", 1);
+        if ($c->get('daily_start')) {
+            $this->parameters->setDailyStart($c->get('daily_start'));
         }
-        $this->parameters->setLanguage($language);
-
-
-        //
-        // REQUIRED. Read the default timezone to use in requests from WeatherKit REST API.
-        //
-        $timezone = Settings::get('default_timezone');
-        if (empty($timezone)) {
-            throw new \RuntimeException("Error! There is no 'default_timezone' key defined in settings.php. Check your settings file.", 1);
+        if ($c->get('daily_end')) {
+            $this->parameters->setDailyEnd($c->get('daily_end'));
         }
-        $this->parameters->setTimeZone($timezone);
-
-
-        //
-        // Read the datasets we will request from WeatherKit REST API. 
-        //
-        $datasets = Settings::get('default_datasets');
-        if (empty($datasets)) {
-            // If not specific datasets have been set, we will request all supported datasets.
-            $datasets = Parameters::getSupportedDatasets();
+        if ($c->get('hourly_start')) {
+            $this->parameters->setHourlyStart($c->get('hourly_start'));
         }
-        $this->parameters->setDatasets($datasets);
-
-        //
-        // Set the default country code to use in requests from WeatherKit REST API. Necessary for weather alerts.
-        //
-        $country_code = Settings::get('default_country_code');
-        if (empty($country_code)) {
-            throw new \RuntimeException("Error! There is no 'default_country_code' key defined in settings.php. Check your settings file.", 1);
+        if ($c->get('hourly_end')) {
+            $this->parameters->setHourlyEnd($c->get('hourly_end'));
         }
-        $this->parameters->setCountryCode($country_code);
-
-        
-        //
-        // Set the default time to start the daily forecast. If this parameter is absent, daily forecasts start on the current day.
-        //
-        $daily_start = Settings::get('default_daily_start');
-        if (!empty($daily_start)) {
-            $this->parameters->setDailyStart($daily_start);
-        }
-        DebugUtils::e(__METHOD__, "daily_start: $daily_start");
-
-        //
-        // Set the default time to end the daily forecast. If this parameter is absent, daily forecasts run for 10 days.
-        //
-        $daily_end = Settings::get('default_daily_end');
-        if (!empty($daily_end)) {
-            $this->parameters->setDailyEnd($daily_end);
-        }
-        DebugUtils::e(__METHOD__, "daily_end: $daily_end");
-
-
-        //
-        // The time to start the hourly forecast. If this parameter is absent, hourly forecasts start on the current hour.
-        //
-        $hourly_start = Settings::get('default_hourly_start');
-        if (!empty($hourly_start)) {
-            $this->parameters->setHourlyStart($hourly_start);
-        }
-        DebugUtils::e(__METHOD__, "hourly_start: $hourly_start");
-
-        //
-        // The time to end the hourly forecast. If this parameter is absent, hourly forecasts run 24 hours or the length of the daily forecast, whichever is longer.
-        //
-        $hourly_end = Settings::get('default_hourly_end');
-        if (!empty($daily_end)) {
-            $this->parameters->setHourlyEnd($hourly_end);
-        }
-        DebugUtils::e(__METHOD__, "hourly_end: $hourly_end");
-
-        //
-        // REQUIRED. Create JWT developer token. It will also be saved in parameters.
-        //
-        DebugUtils::e(__METHOD__, "Create JWT developer token for authentication with WeatherKit API...");
-        $this->generateWeatherKitToken();
-
-        //
-        // Set the desired locations to get weather data.
-        // Here, we read these locations from a json file, defined in settings.php
-        //
-        $locations_file = Settings::get('locations_file_path');
-        if (!empty($locations_file)) {
-            DebugUtils::e(__METHOD__, "Reading geolocations from '$locations_file'...");
-            // Read the file into an array
-            $geolocations = $this->readGeolocationsFile($locations_file);
-            if (empty($geolocations)) {
-                throw new \RuntimeException("Error! The locations array is empty. Check your locations file at: $locations_file", 1);
-            }
-            DebugUtils::e(__METHOD__, "Total locations in file: " . count($geolocations));
-        }
-
-
-        return true;
     }
 
 
 
-
     /**
-     * Generates a JSON Web Token (JWT) from the the user-defined credentials and private key, as 
-     * defined in settings.php, to authenticate with the WeatherKit REST API
-     * 
-     * @return bool
-     * 
+     * Generates the JSON Web Token (JWT) that authenticates us with the WeatherKit REST API,
+     * signing it with the configured private key, and stores it in the parameters.
+     *
      * @see https://developer.apple.com/documentation/weatherkitrestapi/request_authentication_for_weatherkit_rest_api
      */
-    private function generateWeatherKitToken()
+    private function generateWeatherKitToken(): void
     {
-        //
-        // Check if the required WeatherKit credentials are defined in settings.php
-        //
-        if (!Settings::get('WEATHERKIT_PRIVATE_KEY_FILE_PATH')) {
-            throw new \RuntimeException("Error! Key 'WEATHERKIT_PRIVATE_KEY_FILE_PATH' not defined or empty in settings.php. Check your settings file.", 1);
-        } else if (!Settings::get('WEATHERKIT_KEY_ID')) {
-            throw new \RuntimeException("Error! Key 'WEATHERKIT_KEY_ID' not defined or empty in settings.php. Check your settings file.", 1);
-        } else if (!Settings::get('WEATHERKIT_TEAM_ID')) {
-            throw new \RuntimeException("Error! Key 'WEATHERKIT_TEAM_ID' not defined or empty in settings.php. Check your settings file.", 1);
-        } else if (!Settings::get('WEATHERKIT_SERVICE_ID')) {
-            throw new \RuntimeException("Error! Key 'WEATHERKIT_SERVICE_ID' not defined or empty in settings.php. Check your settings file.", 1);
-        }
+        $team_id = $this->config->get('team_id');
+        $service_id = $this->config->get('service_id');
+        $key_id = $this->config->get('key_id');
+        $now = time();
 
-        //
-        // Get the full path of the file containing the WeatherKit private key
-        //
-        $private_key_file = Settings::get('WEATHERKIT_PRIVATE_KEY_FILE_PATH');
-        // Verify the file is reabable
-        if (!is_readable($private_key_file)) {
-            throw new \RuntimeException("Error! The private key file '$private_key_file' does not exist or it is not readable. Check the file...", 1);
-        }
-
-        // 
-        // Read private key
-        //
-        $weatherkit_private_key = file_get_contents($private_key_file);
-        if (empty($weatherkit_private_key)) {
-            throw new \RuntimeException("Error! The private key file '$private_key_file' is empty. Check the file...", 1);
-        }
-
-
-        // Assemble our JWT payload data
         $payload = [
-            //  The issuer claim key. This value is your 10-character Team ID from your developer account.
-            'iss' => Settings::get('WEATHERKIT_TEAM_ID'),
-            // The issued-at claim key. 
-            // This value indicates the time at which the token was generated. 
-            // The value is the number of seconds since epoch in Universal Coordinated Time.
-            'iat' => time(),
-            // The expiration time claim key. 
-            // This value indicates the time after which the token is not accepted by the server. 
-            // The value is the number of seconds since epoch in Universal Coordinated Time.
-            "exp" => (time() + (60 * 5)),
-            //    The subject public claim key. This value is your registered Service ID.
-            'sub' => Settings::get('WEATHERKIT_SERVICE_ID')
-
+            'iss' => $team_id,             // Your 10-character Team ID.
+            'iat' => $now,                 // Issued-at (seconds since epoch, UTC).
+            'exp' => $now + 60 * 5,        // Expiration time.
+            'sub' => $service_id,          // Your registered Service ID.
         ];
-        // JWT payload header
-        $payload_header = [
-            //     A 10-character key identifier you obtain from your developer account.
-            "kid" => Settings::get('WEATHERKIT_KEY_ID'),
-            //     An identifier that consists of your 10-character Team ID and Service ID, separated by a period.
-            "id" => Settings::get('WEATHERKIT_TEAM_ID') . '.' . Settings::get('WEATHERKIT_SERVICE_ID'),
+        $header = [
+            'kid' => $key_id,                    // Your 10-character Key ID.
+            'id' => $team_id . '.' . $service_id, // Team ID and Service ID separated by a period.
         ];
-        // Get key id
-        $weatherkit_key_id = Settings::get('WEATHERKIT_KEY_ID');
 
-        // Encode payload + header to JWT string (to debug encoding @see https://jwt.io/)
-        DebugUtils::e(__METHOD__, "Encoding payload+header into a JWT string...");
-        $jwt = JWT::encode($payload, $weatherkit_private_key, 'ES256', $weatherkit_key_id, $payload_header);
-        $this->parameters->setJWT($jwt);
+        $this->logger->debug('Encoding the WeatherKit developer token (JWT)');
+        $this->parameters->setJWT(JWT::encode($payload, $this->config->privateKey(), 'ES256', $key_id, $header));
     }
 
 
 
     /**
-     * Checks if a directory to export weather data is defined in Settings and verifies it can be read.
-     * 
-     * @return bool
-     * 
+     * Sets the export directory from the configuration, if any.
      */
-    private function readExportDirSetting()
+    private function applyExportDir(): void
     {
-        //
-        // Read the default export_dir defined in settings.php, if any
-        //
-        $export_dir = Settings::get('export_dir');
-        if (empty($export_dir)) {
-            return false;
+        $export_dir = $this->config->get('export_dir');
+        if (!empty($export_dir)) {
+            $this->setExportDir($export_dir);
         }
-
-        if (!str_ends_with($export_dir, '/')) {
-            $export_dir .= '/';
-        }
-        if (!is_readable($export_dir)) {
-            throw new \RuntimeException("Error! The 'export_dir' setting ($export_dir) is not readable. Check your settings file.", 1);
-        }
-        $this->export_dir = $export_dir;
-
-        return true;
     }
 
 
@@ -423,7 +261,7 @@ class PhpWeatherKit
      */
     public function readGeolocationsFile($filePath)
     {
-        DebugUtils::e(__METHOD__, "Reading geolocations text file at: " . $filePath);
+        $this->logger->debug("Reading geolocations text file at: " . $filePath);
 
         if (!is_readable($filePath)) {
             throw new \RuntimeException("Error! The file '$filePath' is not readable.", 1);
@@ -487,7 +325,7 @@ class PhpWeatherKit
         if (empty($language)) {
             throw new \RuntimeException("Error! Empty language parameter.", 1);
         }
-        DebugUtils::e(__METHOD__, "Setting language: " . $language);
+        $this->logger->debug("Setting language: " . $language);
         $this->parameters->setLanguage($language);
 
 
@@ -509,7 +347,7 @@ class PhpWeatherKit
             throw new \RuntimeException("Error! Empty country_code parameter.", 1);
         }
 
-        DebugUtils::e(__METHOD__, "Setting country code: " . $country_code);
+        $this->logger->debug("Setting country code: " . $country_code);
         $this->parameters->setCountryCode($country_code);
 
         return $this;
@@ -532,7 +370,7 @@ class PhpWeatherKit
         }
 
         $datasets = is_array($datasets) ? $datasets : [$datasets];
-        DebugUtils::e(__METHOD__, "Setting datasets: " . implode(',', $datasets));
+        $this->logger->debug("Setting datasets: " . implode(',', $datasets));
         $this->parameters->setDatasets($datasets);
 
         return $this;
@@ -554,7 +392,7 @@ class PhpWeatherKit
         if (empty($timezone)) {
             throw new \RuntimeException("Error! Empty timezone parameter.", 1);
         }
-        DebugUtils::e(__METHOD__, "Setting timezone: " . $timezone);
+        $this->logger->debug("Setting timezone: " . $timezone);
         $this->parameters->setTimeZone($timezone);
 
         return $this;
@@ -571,21 +409,21 @@ class PhpWeatherKit
      */
     public function getWeatherData()
     {
-        DebugUtils::e(__METHOD__, "Validating the parameters...");
+        $this->logger->debug("Validating the parameters...");
         $this->validator->validate($this->parameters);
 
-        DebugUtils::e(__METHOD__, "Creating new weather forecast request...");
+        $this->logger->debug("Creating new weather forecast request...");
         $request = $this->request_factory->createForecastRequest($this->parameters);
 
-        DebugUtils::e(__METHOD__, "Making the request to Weatherkit API to obtain the weather data for this location...");
+        $this->logger->debug("Making the request to Weatherkit API to obtain the weather data for this location...");
         $response = $this->http_client->gzip()->request($request);
 
-        DebugUtils::e(__METHOD__, "Decoding API response...");
+        $this->logger->debug("Decoding API response...");
         $data = json_decode($response->getBody(), true);
 
-        DebugUtils::e(__METHOD__, "Weather data size: " . count(array_keys($data)));
+        $this->logger->debug("Weather data size: " . count(array_keys($data)));
         if (!empty($data) && is_array($data)) {
-            DebugUtils::e(__METHOD__, "Weather data keys: " . implode(', ', array_keys($data)));
+            $this->logger->debug("Weather data keys: " . implode(', ', array_keys($data)));
         }
 
         return new WeatherData($data, $response->getHeaders());
@@ -611,7 +449,7 @@ class PhpWeatherKit
         // Check that the number of bytes written to the file is the same as the size of passed data
         if (file_put_contents($filename . "~", $data, $flags) === strlen($data)) {
             if ( rename($filename . "~", $filename) ) {
-                DebugUtils::e(__METHOD__, "Data saved to file '$filename'. Filesize: " . filesize($filename) . ' bytes');
+                $this->logger->debug("Data saved to file '$filename'. Filesize: " . filesize($filename) . ' bytes');
                 return TRUE;
             }
         }
