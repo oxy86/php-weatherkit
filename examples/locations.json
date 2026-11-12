@@ -1,0 +1,6 @@
+{
+  "london":   { "name": "London",   "code": "london",   "coords": [51.5074, -0.1278],   "timezone": "Europe/London",       "country_code": "GB", "language": "en" },
+  "new-york": { "name": "New York", "code": "new-york", "coords": [40.7128, -74.0060],  "timezone": "America/New_York",    "country_code": "US", "language": "en" },
+  "tokyo":    { "name": "Tokyo",    "code": "tokyo",    "coords": [35.6762, 139.6503],  "timezone": "Asia/Tokyo",          "country_code": "JP", "language": "en" },
+  "sydney":   { "name": "Sydney",   "code": "sydney",   "coords": [-33.8688, 151.2093], "timezone": "Australia/Sydney",    "country_code": "AU", "language": "en" }
+}

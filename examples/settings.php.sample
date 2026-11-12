@@ -1,0 +1,132 @@
+<?php
+
+/**
+ * @file
+ * 
+ * App-specific configuration file.
+ * 
+ * The `$settings` and `$config` array entries of this file are being read in every run
+ * - The $config entries are exported to the $GLOBALS php variable.
+ * - The $settings entries are kept in a static storage of Settings class.
+ * 
+ */
+
+
+/**
+ * `$GLOBALS` CONFIGURATION DEFAULTS & OVERRIDES
+ */
+
+/**
+ * Usage: $GLOBALS['config']['var']['x']['y']
+ */
+// $config['var']['x']['y'] = 'value';
+
+// Uncomment to enable debug messages
+$config['debug_messages'] = true;
+
+/**
+ * SETTINGS THAT YOU NEED TO CHANGE
+ */
+
+
+/**
+ * The full path of the JSON file containing the desired locations (and their coordinates) to get their weather data. Format: 
+ * 
+ * {
+ *  "location_key_1": { "code": "location_code_slug", "name": "A localized_name", "coords": [ 38.322, 23.733 ],  },
+ *  "location_key_2": { "code": "location_code_slug", "name": "A localized name", "coords": [ 39.322, 24.733 ],  },
+ * }
+ * 
+ */
+// $settings['locations_file_path'] = __DIR__ . "/locations.json";
+$settings['locations_file_path'] = __DIR__ . "/locations.json";
+
+/**
+ * An array with the names of the default weather data sets to request from the WeatherKit API.
+ * These will be requested for every location, except if a location defines its own datasets.
+ * 
+ * NOTE: If you do not define datasets, all datasets will be requested
+ * 
+ * @see https://developer.apple.com/documentation/weatherkitrestapi/dataset#possibleValues
+ */
+//$settings['default_datasets'] = ['forecastNextHour', 'currentWeather', 'forecastDaily', 'forecastHourly', 'forecastNextHour', 'weatherAlerts'];
+// $settings['default_datasets'] = ['currentWeather', 'forecastDaily'];
+
+/**
+ * The default language tag to use for localizing responses
+ */
+$settings['default_language'] = 'en';
+
+/**
+ * The ISO Alpha-2 country code for the requested location. This parameter is necessary for weather alerts.
+ */
+$settings['default_country_code'] = 'US';
+
+/**
+ * The time to start the daily forecast. If this parameter is absent, daily forecasts start on the current day.
+ * Must be ISO 8601 date format with Z, i.e. `date('Y-m-d\TH:i:sp');`
+ */
+$current_timestamp = time();
+$beginning_of_day = strtotime("midnight", $current_timestamp);
+$settings['default_daily_start'] = date('Y-m-d\TH:i:sp', $current_timestamp );
+
+/**
+ * The time to end the daily forecast. If this parameter is absent, daily forecasts run for 10 days.
+ * Must be ISO 8601 date format with Z, i.e. `date('Y-m-d\TH:i:sp');`
+ */
+// $another_timestamp = $current_timestamp + 10 * 86400;
+// $beginning_of_day = strtotime("midnight", $another_timestamp);
+// $settings['default_daily_end'] = date('Y-m-d\TH:i:sp', $beginning_of_day);
+
+
+/**
+ * The time to start the hourly forecast. If this parameter is absent, hourly forecasts start on the current hour.
+ * Must be ISO 8601 date format with Z, i.e. `date('Y-m-d\TH:i:sp');`
+ */
+// $beginning_of_day = strtotime("midnight", $current_timestamp);
+$settings['default_hourly_start'] = date('Y-m-d\TH:i:sp', time());
+
+/**
+ * The time to end the hourly forecast. If this parameter is absent, hourly forecasts run 24 hours or the length of the daily forecast, whichever is longer.
+ * Must be ISO 8601 date format with Z, i.e. `date('Y-m-d\TH:i:sp');`
+ */
+// $settings['default_hourly_end'] = date('Y-m-d\TH:i:sp', $current_timestamp+86400);;
+
+
+
+/**
+ * The name of the default timezone to use for rolling up weather forecasts into daily forecasts.
+ */
+$settings['default_timezone'] = 'UTC';
+
+
+/**
+ * 
+ * Your Apple WeatherKit API credentials.
+ * 
+ * @see https://developer.apple.com/documentation/weatherkitrestapi/request_authentication_for_weatherkit_rest_api
+ * 
+ */
+
+//  Your WeatherKit Key ID.
+// This is shown you you, when you register a new WeatherKit key at your Apple Developer account
+$settings['WEATHERKIT_KEY_ID'] = 'XXXXXXXXXX';
+
+// The actual path to your WeatherKit Key private file.
+// This a .p8 file you get when you register a new WeatherKit key at your Apple Developer account
+// Important: After downloading your key from Apple, it cannot be re-downloaded.
+$settings['WEATHERKIT_PRIVATE_KEY_FILE_PATH'] = __DIR__ . "/AuthKey_XXXXXXXXXX.p8";
+
+//  Your registered Service ID. You set it when creating a Service at your Apple Developer account
+$settings['WEATHERKIT_SERVICE_ID'] = 'com.example.weatherkit';
+
+//  Your 10-character Team ID from your developer account.
+$settings['WEATHERKIT_TEAM_ID'] = 'YYYYYYYYYY';
+//  Your key path
+
+
+
+/**
+ * (Optional) The directory where the application will save per location JSON files with weather data
+ */
+$settings['export_dir'] = __DIR__ . "/exported_data";

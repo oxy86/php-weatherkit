@@ -1,0 +1,24 @@
+{
+    "name": "oxy86/php-weatherkit",
+    "description": "A PHP library for Apple's WeatherKit REST API.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["weatherkit", "apple", "weather", "forecast", "api"],
+    "authors": [
+        {
+            "name": "Dimitris Kalamaras",
+            "email": "dimitris.kalamaras@gmail.com"
+        }
+    ],
+    "autoload": {
+        "files": ["src/functions.php"],
+        "psr-4": { "Oxy86\\PhpWeatherKit\\": "src/" }
+    },
+    "require": {
+        "php": ">=8.1",
+        "ext-json": "*",
+        "firebase/php-jwt": "^7.0",
+        "guzzlehttp/guzzle": "^7.0",
+        "psr/http-message": "^2.0"
+    }
+}

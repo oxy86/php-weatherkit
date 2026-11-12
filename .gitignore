@@ -1,0 +1,9 @@
+/vendor/
+composer.lock
+# credentials and local config — never commit
+*.p8
+*.key
+examples/settings.php
+settings.php
+# example output
+examples/exported_data/
