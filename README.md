@@ -2,7 +2,17 @@
 
 A PHP library for [Apple's WeatherKit REST API](https://developer.apple.com/documentation/weatherkitrestapi) (the successor of Dark Sky). It signs the required developer token (JWT, ES256) with your private key, requests the datasets you choose and returns typed objects (`WeatherData`, `DataBlock`, `DataPoint`, `Alert`).
 
+**Status: alpha (0.x).** It works against the live API, but the API will change before 1.0 and there is no test suite yet. See the [ROADMAP](ROADMAP.md).
+
 > **Unofficial.** This project is not affiliated with or endorsed by Apple. "WeatherKit" and "Apple Weather" are trademarks of Apple Inc. If you display WeatherKit data you must follow Apple's [attribution requirements](https://developer.apple.com/weatherkit/get-started/#attribution).
+
+## Features
+- Developer-token (JWT, ES256) generation from your `.p8` key — no manual token handling
+- Fluent request API: `location()`, `language()`, `countryCode()`, `timezone()`, `datasets()`
+- All WeatherKit datasets: `currentWeather`, `forecastNextHour`, `forecastHourly`, `forecastDaily`, `weatherAlerts`
+- Typed response objects: `WeatherData` → `currently()`, `minutely()`, `hourly()`, `daily()`, `alerts()`; each block exposes `dataPoints()`, `summary()`, `metadata()`, `toArray()`
+- Input validation (coordinates, language, country code, timezone, datasets) before any request is sent
+- Batch helper: read many locations from a JSON file and export results per location
 
 ## Requirements
 - PHP 8.1+ with `ext-json`, `ext-openssl`, cURL
@@ -54,6 +64,12 @@ It prints current conditions and a 5-day forecast for the cities in [`examples/l
 { "london": { "name": "London", "code": "london", "coords": [51.5074, -0.1278],
               "timezone": "Europe/London", "country_code": "GB", "language": "en" } }
 ```
+
+## Attribution (Apple requirement)
+Apple requires apps that show WeatherKit data to display the Apple Weather trademark and a link to the legal source. `$weather->currently()->metadata()` exposes `attributionURL()` and `providerLogo()` for this.
+
+## Contributing
+Issues and pull requests are welcome. Please read the [ROADMAP](ROADMAP.md) first — the open items (tests, CI, configuration API) are where help is most useful. Never include credentials in issues or PRs.
 
 ## Security
 Never commit your `.p8` key or `settings.php`. The provided `.gitignore` excludes both.
