@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Oxy86\PhpWeatherKit;
 
+use Oxy86\PhpWeatherKit\Exception\ConfigurationException;
+
 /**
  * Immutable library configuration.
  *
@@ -60,21 +62,21 @@ final class Config
     /**
      * @param array<string, mixed> $values
      *
-     * @throws \InvalidArgumentException when a required value is missing or a key is unknown.
+     * @throws ConfigurationException when a required value is missing or a key is unknown.
      */
     public function __construct(array $values)
     {
         $unknown = array_diff(array_keys($values), self::KNOWN);
         if ($unknown) {
-            throw new \InvalidArgumentException('Unknown configuration key(s): ' . implode(', ', $unknown));
+            throw new ConfigurationException('Unknown configuration key(s): ' . implode(', ', $unknown));
         }
         foreach (self::REQUIRED as $key) {
             if (!isset($values[$key]) || $values[$key] === '') {
-                throw new \InvalidArgumentException("Missing required configuration value '$key'.");
+                throw new ConfigurationException("Missing required configuration value '$key'.");
             }
         }
         if (empty($values['private_key']) && empty($values['private_key_path'])) {
-            throw new \InvalidArgumentException("Configuration needs either 'private_key' or 'private_key_path'.");
+            throw new ConfigurationException("Configuration needs either 'private_key' or 'private_key_path'.");
         }
         $this->values = $values;
     }
@@ -90,13 +92,13 @@ final class Config
     /**
      * Loads a legacy `settings.php` file (which fills a `$settings` array) from the given directory.
      *
-     * @throws \RuntimeException when the file is not readable.
+     * @throws ConfigurationException when the file is not readable.
      */
     public static function fromSettingsFile(string $directory): self
     {
         $file = rtrim($directory, '/\\') . '/settings.php';
         if (!is_readable($file)) {
-            throw new \RuntimeException("Cannot read settings file: $file");
+            throw new ConfigurationException("Cannot read settings file: $file");
         }
 
         $load = static function (string $__file): array {
@@ -127,7 +129,7 @@ final class Config
     /**
      * Returns the PEM contents of the private key.
      *
-     * @throws \RuntimeException when the key file is missing, unreadable or empty.
+     * @throws ConfigurationException when the key file is missing, unreadable or empty.
      */
     public function privateKey(): string
     {
@@ -136,11 +138,11 @@ final class Config
         }
         $path = (string) $this->values['private_key_path'];
         if (!is_readable($path)) {
-            throw new \RuntimeException("The private key file '$path' does not exist or is not readable.");
+            throw new ConfigurationException("The private key file '$path' does not exist or is not readable.");
         }
         $key = file_get_contents($path);
         if ($key === false || trim($key) === '') {
-            throw new \RuntimeException("The private key file '$path' is empty.");
+            throw new ConfigurationException("The private key file '$path' is empty.");
         }
         return $key;
     }

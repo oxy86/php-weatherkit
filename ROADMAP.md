@@ -7,7 +7,8 @@ Blocks announcing the package.
 
 ### Quality
 - [x] PHPUnit set up (`composer test`-style: `vendor/bin/phpunit`); config, constructor, logger, JWT, export tests
-- [ ] Tests with recorded WeatherKit JSON fixtures for `WeatherData`/`DataBlock`/`DataPoint`/`Alert` and a mocked HTTP client (no network, no credentials in CI)
+- [x] Tests with a recorded WeatherKit fixture (London) + hand-written alerts fixture, and a mock PSR-18 client (59 tests, offline)
+- [ ] Replace the hand-written `weather-alerts.json` fixture with a recorded one when a live alert is available
 - [ ] Unit tests for validation rules (coordinates, language, country code, timezone, datasets)
 - [x] Unit tests for JWT generation (throwaway key generated in the test)
 - [x] (workflow added, first run pending) GitHub Actions: tests on PHP 8.1–8.4, `composer audit`, static analysis (PHPStan, start at level 5)
@@ -17,20 +18,24 @@ Blocks announcing the package.
 - [x] **Configuration without `settings.php`**: `new PhpWeatherKit([...])` / `Config`; legacy `settings.php` still loadable via a directory path. `Settings` singleton and `$GLOBALS['config']` removed (BREAKING vs 0.1)
 - [x] Removed `DebugUtils` echo output; optional PSR-3 logger injected instead
 - [x] Key can be passed as a string (`private_key`) or path (`private_key_path`), read in one place (`Config::privateKey()`)
-- [ ] Cache/reuse the JWT until shortly before expiry instead of regenerating it per instance
-- [ ] Typed exceptions (`ValidationException`, `AuthenticationException`, `RateLimitException`, `ApiException`) instead of generic `\Exception`/`RuntimeException`
-- [ ] Inject the HTTP client (PSR-18) so users can bring their own client/mock it; drop the hard Guzzle dependency if feasible
-- [ ] `declare(strict_types=1)` everywhere (done in `Config` only), native parameter/return types, remove legacy docblock-only typing
+- [x] JWT cached and renewed 30 s before expiry
+- [x] Typed exceptions (`ConfigurationException`, `ValidationException`, `AuthenticationException`, `RateLimitException`, `ApiException`)
+- [x] PSR-18 client / PSR-17 factory injectable (Guzzle is still a hard dependency as the zero-config default; make it `suggest` in 0.3/1.0)
+- [x] `declare(strict_types=1)` everywhere (native parameter/return types still to do)
+- [ ] Native parameter/return types on public methods, native parameter/return types, remove legacy docblock-only typing
 - [ ] Remove dead Dark Sky leftovers (e.g. stale notes in `DataPoint`) and unused Laravel-style helpers
-- [ ] Review `src/functions.php` (`json_decode` override, `conditionCodeToIconName`): namespace-polluting global functions → move to classes
+- [x] Removed the namespaced `json_decode` override
+- [ ] Move `array_get`/`conditionCodeToIconName` from `src/functions.php` into classes (keep the function as a deprecated wrapper)
 - [ ] Support the WeatherKit `availability` endpoint and the `currentWeather` / `forecastDaily` units parameter; check API coverage against Apple's current reference
 
 ### Packaging & docs
-- [ ] CHANGELOG.md (Keep a Changelog), tag `v0.2.0`
+- [x] CHANGELOG.md (Keep a Changelog)
+- [ ] Tag `v0.2.0` and create the GitHub release
 - [ ] Publish on Packagist; add auto-update webhook
-- [ ] README badges (CI, Packagist version, PHP version, license)
-- [ ] Documentation: all datasets and DataPoint fields, error handling, attribution, rate limits/quotas
-- [ ] `CONTRIBUTING.md`, `SECURITY.md` (private vulnerability reporting), issue and PR templates
+- [x] README badges: CI, PHP, license (add Packagist version after the first release)
+- [x] README: error handling, HTTP client/logging, attribution
+- [ ] Documentation: all datasets and DataPoint fields, rate limits/quotas
+- [x] `CONTRIBUTING.md`, `SECURITY.md`, issue and PR templates
 - [ ] GitHub repo settings: description, topics, enable private vulnerability reporting, branch protection on `main`
 - [ ] Confirm package name (`oxy86/php-weatherkit`) is final before the first Packagist release (renaming later is painful)
 
@@ -54,7 +59,12 @@ Blocks announcing the package.
 - Track Apple WeatherKit API changes (new datasets, deprecations)
 - Respond to issues; triage monthly
 
+## Findings to look into
+- Requesting `weatherAlerts` as the *only* dataset returned HTTP 400 in a live test (together with `currentWeather` it worked). Investigate whether the library must always add another dataset or Apple changed behavior.
+- A JWT signed with a wrong key was still accepted by the API in a live test (with the real Team/Service ID) — do not rely on the library to detect a wrong key; verify against the Apple portal.
+
 ## Done
+- [x] 2026-11-12: Beaufort bug fix (null for fractional wind speeds), alerts parsing aligned with the WeatherKit schema, latitude/longitude 0 accepted
 - [x] 2026-11-12: Config class, PSR-3 logging, first PHPUnit tests (22 passing), live re-verification with string key
 - [x] MIT license with the original DarkSkyApi (Dmitry Ivanov) notice
 - [x] PHP ≥ 8.1, `firebase/php-jwt` ^7

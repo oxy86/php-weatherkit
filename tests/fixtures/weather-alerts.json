@@ -1,0 +1,48 @@
+{
+  "weatherAlerts": {
+    "name": "weatherAlerts",
+    "detailsUrl": "https://weatherkit.apple.com/alertDetail/example",
+    "alerts": [
+      {
+        "id": "00000000-0000-0000-0000-000000000001",
+        "areaId": "example-area-1",
+        "areaName": "Example County",
+        "attributionURL": "https://example.com/attribution",
+        "countryCode": "US",
+        "description": "Example thunderstorm warning",
+        "effectiveTime": "2026-01-01T10:00:00Z",
+        "expireTime": "2026-01-01T14:00:00Z",
+        "issuedTime": "2026-01-01T09:30:00Z",
+        "eventOnsetTime": "2026-01-01T10:00:00Z",
+        "eventEndTime": "2026-01-01T14:00:00Z",
+        "detailsUrl": "https://weatherkit.apple.com/alertDetail/example/1",
+        "phenomenon": "Thunderstorm",
+        "severity": "severe",
+        "significance": "Warning",
+        "source": "Example Weather Service",
+        "eventSource": "Example",
+        "urgency": "immediate",
+        "certainty": "likely",
+        "importance": "high",
+        "responses": [
+          "shelter"
+        ]
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000002",
+        "areaId": "example-area-2",
+        "areaName": "Other County",
+        "countryCode": "US",
+        "description": "Example wind advisory",
+        "severity": "minor",
+        "phenomenon": "Wind",
+        "significance": "Advisory",
+        "source": "Example Weather Service",
+        "urgency": "expected",
+        "certainty": "possible",
+        "importance": "normal",
+        "responses": []
+      }
+    ]
+  }
+}

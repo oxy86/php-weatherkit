@@ -78,7 +78,7 @@ final class ConfigTest extends TestCase
         $values = self::valid();
         unset($values['private_key']);
         $config = Config::fromArray($values + ['private_key_path' => '/nonexistent/key.p8']);
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(\Oxy86\PhpWeatherKit\Exception\ConfigurationException::class);
         $config->privateKey();
     }
 
@@ -106,7 +106,7 @@ PHP);
 
     public function testMissingSettingsFileThrows(): void
     {
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(\Oxy86\PhpWeatherKit\Exception\ConfigurationException::class);
         Config::fromSettingsFile('/nonexistent');
     }
 }

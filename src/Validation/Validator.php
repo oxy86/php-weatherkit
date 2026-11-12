@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Oxy86\PhpWeatherKit\Validation;
 
 use Oxy86\PhpWeatherKit\Parameters;
@@ -11,7 +13,7 @@ use Oxy86\PhpWeatherKit\Validation\Rules\DatasetsRule;
 use Oxy86\PhpWeatherKit\Validation\Rules\CountryCodeRule;
 use Oxy86\PhpWeatherKit\Validation\Rules\TimeZoneRule;
 
-use InvalidArgumentException;
+use Oxy86\PhpWeatherKit\Exception\ValidationException;
 
 
 /**
@@ -27,7 +29,7 @@ class Validator
      * @param  \Oxy86\PhpWeatherKit\Parameters  $parameters
      * @return void
      *
-     * @throws \InvalidArgumentException
+     * @throws ValidationException
      */
     public function validate(Parameters $parameters)
     {
@@ -61,12 +63,12 @@ class Validator
      * @param  mixed  $value
      * @return void
      *
-     * @throws \InvalidArgumentException
+     * @throws ValidationException
      */
     protected function validateParameterValue(Rule $rule, $value)
     {
         if (!$rule->passes($value)) {
-            throw new InvalidArgumentException($rule->message());
+            throw new ValidationException($rule->message());
         }
     }
 }

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Oxy86\PhpWeatherKit\Weather;
 
 use function Oxy86\PhpWeatherKit\array_get;
@@ -134,18 +136,19 @@ class WeatherData
      * @see https://developer.apple.com/documentation/weatherkitrestapi/weatheralertcollection
      *
      * @return \Oxy86\PhpWeatherKit\Weather\Alert[]|null
+     *   NULL when the response has no alerts block (the dataset was not requested or is unavailable for the location).
      */
     public function alerts()
     {
-        $alerts = array_get($this->data, 'weatherAlerts');
+        $collection = array_get($this->data, 'weatherAlerts');
 
-        if (is_null($alerts)) {
+        if (!is_array($collection)) {
             return null;
         }
 
         return array_map(function (array $alert) {
             return new Alert($alert);
-        }, $alerts);
+        }, array_values((array) array_get($collection, 'alerts', [])));
     }
 
 

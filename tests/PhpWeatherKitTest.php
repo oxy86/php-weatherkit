@@ -8,35 +8,10 @@ use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 use Oxy86\PhpWeatherKit\Config;
 use Oxy86\PhpWeatherKit\PhpWeatherKit;
-use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
 
 final class PhpWeatherKitTest extends TestCase
 {
-    private static string $privatePem;
-    private static string $publicPem;
-
-    public static function setUpBeforeClass(): void
-    {
-        $key = openssl_pkey_new(['curve_name' => 'prime256v1', 'private_key_type' => OPENSSL_KEYTYPE_EC]);
-        openssl_pkey_export($key, $pem);
-        self::$privatePem = $pem;
-        self::$publicPem = openssl_pkey_get_details($key)['key'];
-    }
-
-    private function values(array $extra = []): array
-    {
-        return $extra + [
-            'team_id' => 'TEAM123456',
-            'key_id' => 'KEY1234567',
-            'service_id' => 'com.example.weatherkit',
-            'private_key' => self::$privatePem,
-            'language' => 'en',
-            'timezone' => 'UTC',
-            'country_code' => 'US',
-        ];
-    }
-
     private function jwt(PhpWeatherKit $api): string
     {
         return $api->getParameters()->getJWT();
@@ -50,7 +25,7 @@ final class PhpWeatherKitTest extends TestCase
 
     public function testInvalidConfigTypeThrows(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(\Oxy86\PhpWeatherKit\Exception\ConfigurationException::class);
         new PhpWeatherKit(42);
     }
 

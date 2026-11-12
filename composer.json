@@ -3,7 +3,13 @@
     "description": "A PHP library for Apple's WeatherKit REST API.",
     "type": "library",
     "license": "MIT",
-    "keywords": ["weatherkit", "apple", "weather", "forecast", "api"],
+    "keywords": [
+        "weatherkit",
+        "apple",
+        "weather",
+        "forecast",
+        "api"
+    ],
     "authors": [
         {
             "name": "Dimitris Kalamaras",
@@ -11,18 +17,29 @@
         }
     ],
     "autoload": {
-        "files": ["src/functions.php"],
-        "psr-4": { "Oxy86\\PhpWeatherKit\\": "src/" }
+        "files": [
+            "src/functions.php"
+        ],
+        "psr-4": {
+            "Oxy86\\PhpWeatherKit\\": "src/"
+        }
     },
     "require": {
         "php": ">=8.1",
         "ext-json": "*",
         "firebase/php-jwt": "^7.0",
         "guzzlehttp/guzzle": "^7.0",
-        "psr/http-message": "^2.0",
+        "psr/http-client": "^1.0",
+        "psr/http-factory": "^1.0",
+        "psr/http-message": "^1.1 || ^2.0",
         "psr/log": "^3.0"
     },
     "require-dev": {
         "phpunit/phpunit": "^10.5"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Oxy86\\PhpWeatherKit\\Tests\\": "tests/"
+        }
     }
 }

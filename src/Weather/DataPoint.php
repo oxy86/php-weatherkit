@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Oxy86\PhpWeatherKit\Weather;
 
 use function Oxy86\PhpWeatherKit\array_get;
@@ -415,33 +417,21 @@ class DataPoint
     {
         $wind_speed = $this->windSpeed();
 
-        if ($wind_speed < 2) {
-            return 0;
-        } else if ($wind_speed >= 2 && $wind_speed <= 5) {
-            return 1;   // Light Air
-        } else if ($wind_speed >= 6 && $wind_speed <= 11) {
-            return 2;   // Light Breeze
-        } else if ($wind_speed >= 12 && $wind_speed <= 19) {
-            return 3;   // Gentle Breeze
-        } else if ($wind_speed >= 20 && $wind_speed <= 28) {
-            return 4;   // Moderate Breeze
-        } else if ($wind_speed >= 29 && $wind_speed <= 38) {
-            return 5;   // Fresh Breeze
-        } else if ($wind_speed >= 39 && $wind_speed <= 49) {
-            return 6;   // Strong Breeze
-        } else if ($wind_speed >= 50 && $wind_speed <= 61) {
-            return 7;   // High wind, moderate gale,near gale 
-        } else if ($wind_speed >= 62 && $wind_speed <= 74) {
-            return 8;   //  	Gale or Fresh Gale
-        } else if ($wind_speed >= 75 && $wind_speed <= 88) {
-            return 9;   //  	Strong/severe gale, Highwaves (6 meters).
-        } else if ($wind_speed >= 89 && $wind_speed <= 102) {
-            return 10;   //  	Storm, Large waves (6-9 meters)
-        } else if ($wind_speed >= 103 && $wind_speed <= 117) {
-            return 11;   //  	Violent storm, Large waves (9-14 meters)
-        } else if ($wind_speed >= 118) {
-            return 12;   //  	Hurricane, Largewaves over 14 meters
+        if ($wind_speed === null) {
+            return null;
         }
+
+        // Upper bounds (km/h, exclusive) of Beaufort forces 0..11; anything above is force 12.
+        // Half-open ranges, so fractional speeds (e.g. 11.57) never fall between two classes.
+        $upper_bounds = [2, 6, 12, 20, 29, 39, 50, 62, 75, 89, 103, 118];
+
+        foreach ($upper_bounds as $force => $upper_bound) {
+            if ($wind_speed < $upper_bound) {
+                return $force;
+            }
+        }
+
+        return 12;   // Hurricane
     }
 
 

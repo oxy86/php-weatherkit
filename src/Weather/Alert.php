@@ -1,13 +1,20 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Oxy86\PhpWeatherKit\Weather;
 
 use function Oxy86\PhpWeatherKit\array_get;
 
+/**
+ * A severe weather alert (WeatherKit `WeatherAlertSummary`).
+ *
+ * @see https://developer.apple.com/documentation/weatherkitrestapi/weatheralertsummary
+ */
 class Alert
 {
     /**
-     * The alert.
+     * The alert data.
      *
      * @var array
      */
@@ -24,80 +31,121 @@ class Alert
         $this->alert = $alert;
     }
 
-    /**
-     * A detailed description of the alert.
-     *
-     * @return string|null
-     */
+    /** A unique identifier of the alert. */
+    public function id()
+    {
+        return array_get($this->alert, 'id');
+    }
+
+    /** A human-readable description of the alert. */
     public function description()
     {
         return array_get($this->alert, 'description');
     }
 
-    /**
-     * The UNIX time at which the alert will expire.
-     *
-     * @return int|null
-     */
-    public function expires()
+    /** The name of the affected area. */
+    public function areaName()
     {
-        return array_get($this->alert, 'expires');
+        return array_get($this->alert, 'areaName');
     }
 
-    /**
-     * The names of the regions covered by this weather alert.
-     *
-     * @return array|null
-     */
-    public function regions()
+    /** The official identifier of the affected area. */
+    public function areaId()
     {
-        return array_get($this->alert, 'regions');
+        return array_get($this->alert, 'areaId');
     }
 
-    /**
-     * The severity of the weather alert.
-     *
-     * Will take one of the following values:
-     * "advisory" - an individual should be aware of potentially severe weather,
-     * "watch" - an individual should prepare for potentially severe weather,
-     * "warning" - an individual should take immediate action to protect themselves and others
-     *             from potentially severe weather.
-     *
-     * @return string|null
-     */
+    /** The ISO 3166 country code of the alert. */
+    public function countryCode()
+    {
+        return array_get($this->alert, 'countryCode');
+    }
+
+    /** The severity: extreme, severe, moderate, minor or unknown. */
     public function severity()
     {
         return array_get($this->alert, 'severity');
     }
 
-    /**
-     * The UNIX time at which the alert was issued.
-     *
-     * @return int|null
-     */
-    public function time()
+    /** The type of weather event (e.g. wind, thunderstorm). */
+    public function phenomenon()
     {
-        return array_get($this->alert, 'time');
+        return array_get($this->alert, 'phenomenon');
     }
 
-    /**
-     * A brief description of the alert.
-     *
-     * @return string|null
-     */
-    public function title()
+    public function significance()
     {
-        return array_get($this->alert, 'title');
+        return array_get($this->alert, 'significance');
     }
 
-    /**
-     * An HTTP(S) URI that one may refer to for detailed information about the alert.
-     *
-     * @return string|null
-     */
-    public function uri()
+    /** The urgency: immediate, expected, future, past or unknown. */
+    public function urgency()
     {
-        return array_get($this->alert, 'uri');
+        return array_get($this->alert, 'urgency');
+    }
+
+    /** The certainty: observed, likely, possible, unlikely or unknown. */
+    public function certainty()
+    {
+        return array_get($this->alert, 'certainty');
+    }
+
+    /** The importance: high, normal or low. */
+    public function importance()
+    {
+        return array_get($this->alert, 'importance');
+    }
+
+    /** The recommended responses (array of strings). */
+    public function responses()
+    {
+        return array_get($this->alert, 'responses', []);
+    }
+
+    /** The name of the issuing authority. */
+    public function source()
+    {
+        return array_get($this->alert, 'source');
+    }
+
+    /** The time the alert was issued (ISO 8601). */
+    public function issuedTime()
+    {
+        return array_get($this->alert, 'issuedTime');
+    }
+
+    /** The time the alert takes effect (ISO 8601). */
+    public function effectiveTime()
+    {
+        return array_get($this->alert, 'effectiveTime');
+    }
+
+    /** The time the alert expires (ISO 8601). */
+    public function expireTime()
+    {
+        return array_get($this->alert, 'expireTime');
+    }
+
+    public function eventOnsetTime()
+    {
+        return array_get($this->alert, 'eventOnsetTime');
+    }
+
+    public function eventEndTime()
+    {
+        return array_get($this->alert, 'eventEndTime');
+    }
+
+    /** A URL with more details about the alert. */
+    public function detailsUrl()
+    {
+        return array_get($this->alert, 'detailsUrl');
+    }
+
+    /** Attribution URL for the alert source. */
+    public function attributionUrl()
+    {
+        return array_get($this->alert, 'attributionURL');
     }
 
     /**

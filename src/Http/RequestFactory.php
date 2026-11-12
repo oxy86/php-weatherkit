@@ -1,142 +1,68 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Oxy86\PhpWeatherKit\Http;
 
 use Oxy86\PhpWeatherKit\Parameters;
-
-
+use Psr\Http\Message\RequestFactoryInterface;
+use Psr\Http\Message\RequestInterface;
 
 /**
- * Creates a Request factory, which generates new Requests
+ * Builds the PSR-7 request for the WeatherKit weather endpoint.
+ *
+ * @see https://developer.apple.com/documentation/weatherkitrestapi/get_api_v1_weather_language_latitude_longitude
  */
 class RequestFactory
 {
+    private const BASE_URL = 'https://weatherkit.apple.com/api/v1/weather';
 
-    /**
-     * The JSON Web Token (JWT) to authenticate the app in WeatherKit REST API  
-     * Passed from parent. 
-     * 
-     * @var string
-     */
-    protected $jwt;
+    private RequestFactoryInterface $factory;
 
-    /**
-     * Create a new instance of the request factory.
-     *
-     * @param  string|null  $private_key_file
-     *  The path to the WeatherKit private key file
-     * 
-     * @return void
-     */
-    public function __construct(?string $jwt = null)
+    public function __construct(RequestFactoryInterface $factory)
     {
-        $this->jwt = $jwt;
+        $this->factory = $factory;
+    }
+
+    public function createForecastRequest(Parameters $parameters, string $jwt): RequestInterface
+    {
+        $uri = sprintf(
+            '%s/%s/%s/%s?%s',
+            self::BASE_URL,
+            rawurlencode((string) $parameters->getLanguage()),
+            number_format(round((float) $parameters->getLatitude(), 3), 3, '.', ''),
+            number_format(round((float) $parameters->getLongitude(), 3), 3, '.', ''),
+            $this->buildQuery($parameters)
+        );
+
+        return $this->factory->createRequest('GET', $uri)
+            ->withHeader('Authorization', 'Bearer ' . $jwt)
+            ->withHeader('Accept', 'application/json');
     }
 
     /**
-     * Creates forecast Request(s) using the given parameters to build the request url and query
-     *
-     * @param  \Oxy86\PhpWeatherKit\Parameters  $parameters
-     * @return \Oxy86\PhpWeatherKit\Http\Request|\Oxy86\PhpWeatherKit\Http\Request[]
+     * Builds the query string. Commas, colons and slashes are kept readable; everything else is RFC 3986 encoded.
      */
-    public function createForecastRequest(Parameters $parameters)
+    public function buildQuery(Parameters $parameters): string
     {
-
-        $url = $this->generateForecastUrl($parameters);
-
-        $query = $this->buildQuery($parameters);
-
-        if ($url instanceof Url) {
-            return $this->createRequest($url, $query);
-        }
-
-        // For multiple 
-        return array_map(function (Url $url) use ($query) {
-            return $this->createRequest($url, $query);
-        }, $url);
-    }
-
-
-    /**
-     * Compose the forecast URL by the given parameters.
-     *
-     * @param  \Oxy86\PhpWeatherKit\Parameters  $parameters
-     * @return \Oxy86\PhpWeatherKit\Http\Url
-     */
-    protected function generateForecastUrl(Parameters $parameters)
-    {
-        $language = $parameters->getLanguage();
-
-        $latitude = round($parameters->getLatitude(), 3);
-        $longitude = round($parameters->getLongitude(), 3);
-
-        $latitude = number_format($latitude, 3);
-        $longitude = number_format($longitude, 3);
-
-        return new Url("https://weatherkit.apple.com/api/v1/weather/{$language}/{$latitude}/{$longitude}");
-    }
-
-
-        /**
-     * Build the request query string by the given parameters.
-     *
-     * @param  \Oxy86\PhpWeatherKit\Parameters  $parameters
-     * @return string
-     */
-    public function buildQuery(Parameters $parameters)
-    {
-        if ( is_array($parameters->getDatasets()) ) {
-            $datasets = implode(',', $parameters->getDatasets());
-        }
-        else {
-            $datasets = $parameters->getDatasets();
-        }
-        $data_for_query = [];
-
-        // Required
-        $data_for_query['timezone'] = $parameters->getTimeZone();
+        $datasets = $parameters->getDatasets();
+        $query = ['timezone' => $parameters->getTimeZone()];
 
         if (!empty($datasets)) {
-            $data_for_query['dataSets'] = $datasets;
+            $query['dataSets'] = is_array($datasets) ? implode(',', $datasets) : $datasets;
         }
-        if (!empty($parameters->getDailyStart())) {
-            $data_for_query['dailyStart'] = $parameters->getDailyStart();
-        }
-        if (!empty($parameters->getDailyEnd())) {
-            $data_for_query['dailyEnd'] = $parameters->getDailyEnd();
-        }
-        if (!empty($parameters->getHourlyStart())) {
-            $data_for_query['hourlyStart'] = $parameters->getHourlyStart();
-        }
-        if (!empty($parameters->getHourlyEnd())) {
-            $data_for_query['hourlyEnd'] = $parameters->getHourlyEnd();
-        }
-        
-        if (!empty($parameters->getCountryCode())) {
-            $data_for_query['countryCode'] = $parameters->getCountryCode();
+        foreach ([
+            'dailyStart' => $parameters->getDailyStart(),
+            'dailyEnd' => $parameters->getDailyEnd(),
+            'hourlyStart' => $parameters->getHourlyStart(),
+            'hourlyEnd' => $parameters->getHourlyEnd(),
+            'countryCode' => $parameters->getCountryCode(),
+        ] as $name => $value) {
+            if (!empty($value)) {
+                $query[$name] = $value;
+            }
         }
 
-
-        $query = http_build_query($data_for_query);
-
-
-        return urldecode($query);
-    }
-
-
-
-    /**
-     * Creates a new Request using the given URL object and the query string.
-     *
-     * @param  \Oxy86\PhpWeatherKit\Http\Url  $url
-     * @param  string  $query
-     * @return \Oxy86\PhpWeatherKit\Http\Request
-     */
-    protected function createRequest(Url $url, $query)
-    {
-        // Create a request id using ms from unix epoch time
-        $id = microtime(true);
-        // Create the new Request passing the id, the query, and the JWT credentials
-        return new Request($url->value(), $query, $id, $this->jwt);
+        return str_replace(['%2C', '%3A', '%2F'], [',', ':', '/'], http_build_query($query, '', '&', PHP_QUERY_RFC3986));
     }
 }

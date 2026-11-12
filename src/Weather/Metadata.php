@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Oxy86\PhpWeatherKit\Weather;
 
 use function Oxy86\PhpWeatherKit\array_get;

@@ -1,15 +1,23 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Oxy86\PhpWeatherKit;
 
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Oxy86\PhpWeatherKit\Validation\Validator;
+use Oxy86\PhpWeatherKit\Exception\ApiException;
+use Oxy86\PhpWeatherKit\Exception\AuthenticationException;
+use Oxy86\PhpWeatherKit\Exception\ConfigurationException;
+use Oxy86\PhpWeatherKit\Exception\RateLimitException;
+use Oxy86\PhpWeatherKit\Exception\ValidationException;
 use Oxy86\PhpWeatherKit\Http\RequestFactory;
-use Oxy86\PhpWeatherKit\Http\GuzzleClient;
+use Psr\Http\Client\ClientExceptionInterface;
+use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\RequestFactoryInterface;
 use Oxy86\PhpWeatherKit\Weather\WeatherData;
 
-use function Oxy86\PhpWeatherKit\json_decode;
 
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
@@ -67,11 +75,23 @@ class PhpWeatherKit
 
 
     /**
-     * The HTTP client (Guzzle).
+     * The PSR-18 HTTP client.
      *
-     * @var \Oxy86\PhpWeatherKit\Http\GuzzleClient
+     * @var \Psr\Http\Client\ClientInterface
      */
     protected $http_client;
+
+    /**
+     * The current developer token (JWT) and the time it expires.
+     *
+     * @var string|null
+     */
+    protected $token;
+
+    /**
+     * @var int
+     */
+    protected $token_expires_at = 0;
 
     /**
      * The request factory.
@@ -89,8 +109,14 @@ class PhpWeatherKit
      *   the path of a directory containing a legacy settings.php file.
      * @param \Psr\Log\LoggerInterface|null $logger
      *   Optional PSR-3 logger. Debug messages are sent to it; nothing is printed otherwise.
+     * @param \Psr\Http\Client\ClientInterface|null $http_client
+     *   Optional PSR-18 HTTP client. Defaults to Guzzle.
+     * @param \Psr\Http\Message\RequestFactoryInterface|null $request_factory
+     *   Optional PSR-17 request factory. Defaults to the one from guzzlehttp/psr7.
+     *
+     * @throws \Oxy86\PhpWeatherKit\Exception\ConfigurationException
      */
-    public function __construct($config, ?LoggerInterface $logger = null)
+    public function __construct($config, ?LoggerInterface $logger = null, ?ClientInterface $http_client = null, ?RequestFactoryInterface $request_factory = null)
     {
         $this->logger = $logger ?? new NullLogger();
 
@@ -99,7 +125,7 @@ class PhpWeatherKit
         } elseif (is_string($config)) {
             $config = Config::fromSettingsFile($config);
         } elseif (!$config instanceof Config) {
-            throw new \InvalidArgumentException('The configuration must be a Config object, an array or a directory path.');
+            throw new ConfigurationException('The configuration must be a Config object, an array or a directory path.');
         }
         $this->config = $config;
 
@@ -109,14 +135,14 @@ class PhpWeatherKit
         $this->generateWeatherKitToken();
 
         $this->validator = new Validator;
-        $this->http_client = new GuzzleClient;
-        $this->request_factory = new RequestFactory($this->parameters->getJWT());
+        $this->http_client = $http_client ?? $this->defaultHttpClient();
+        $this->request_factory = new RequestFactory($request_factory ?? $this->defaultRequestFactory());
 
         $locations_file = $this->config->get('locations_file');
         if (!empty($locations_file)) {
             $this->logger->debug("Reading geolocations from '$locations_file'");
             if (empty($this->readGeolocationsFile($locations_file))) {
-                throw new \RuntimeException("The locations file '$locations_file' is empty or invalid.");
+                throw new ConfigurationException("The locations file '$locations_file' is empty or invalid.");
             }
         }
     }
@@ -190,7 +216,36 @@ class PhpWeatherKit
         ];
 
         $this->logger->debug('Encoding the WeatherKit developer token (JWT)');
-        $this->parameters->setJWT(JWT::encode($payload, $this->config->privateKey(), 'ES256', $key_id, $header));
+        $this->token = JWT::encode($payload, $this->config->privateKey(), 'ES256', $key_id, $header);
+        $this->token_expires_at = $payload['exp'];
+        $this->parameters->setJWT($this->token);
+    }
+
+    /**
+     * Returns the developer token, generating a new one when the current one is about to expire.
+     */
+    private function token(): string
+    {
+        if ($this->token === null || $this->token_expires_at - time() < 30) {
+            $this->generateWeatherKitToken();
+        }
+        return $this->token;
+    }
+
+    private function defaultHttpClient(): ClientInterface
+    {
+        if (!class_exists(\GuzzleHttp\Client::class)) {
+            throw new ConfigurationException('No HTTP client given and Guzzle is not installed. Pass a PSR-18 client or run: composer require guzzlehttp/guzzle');
+        }
+        return new \GuzzleHttp\Client(['http_errors' => false]);
+    }
+
+    private function defaultRequestFactory(): RequestFactoryInterface
+    {
+        if (!class_exists(\GuzzleHttp\Psr7\HttpFactory::class)) {
+            throw new ConfigurationException('No PSR-17 request factory given and guzzlehttp/psr7 is not installed.');
+        }
+        return new \GuzzleHttp\Psr7\HttpFactory();
     }
 
 
@@ -228,7 +283,7 @@ class PhpWeatherKit
             $export_dir .= '/';
         }
         if (!is_readable($export_dir)) {
-            throw new \RuntimeException("Error! The directory '$export_dir' is not readable.", 1);
+            throw new ConfigurationException("The directory '$export_dir' is not readable.");
         }
         $this->export_dir = $export_dir;
 
@@ -264,14 +319,14 @@ class PhpWeatherKit
         $this->logger->debug("Reading geolocations text file at: " . $filePath);
 
         if (!is_readable($filePath)) {
-            throw new \RuntimeException("Error! The file '$filePath' is not readable.", 1);
+            throw new ConfigurationException("The file '$filePath' is not readable.");
         }
 
-        // Get the contents of the JSON file 
-        $strJsonFileContents = file_get_contents($filePath);
-
-        // Decode it to PHP array 
-        $this->geolocations = json_decode($strJsonFileContents, true);
+        $locations = json_decode((string) file_get_contents($filePath), true);
+        if (!is_array($locations)) {
+            throw new ConfigurationException("The locations file '$filePath' does not contain valid JSON: " . json_last_error_msg());
+        }
+        $this->geolocations = $locations;
 
         return $this->geolocations;
     }
@@ -299,11 +354,11 @@ class PhpWeatherKit
      */
     public function location($latitude, $longitude)
     {
-        if (empty($latitude)) {
-            throw new \RuntimeException("Error! Empty latitude parameter.", 1);
+        if ($latitude === null || $latitude === '') {
+            throw new ValidationException("Empty latitude parameter.");
         }
-        if (empty($longitude)) {
-            throw new \RuntimeException("Error! Empty longitude parameter.", 1);
+        if ($longitude === null || $longitude === '') {
+            throw new ValidationException("Empty longitude parameter.");
         }
         $this->parameters->setLatitude($latitude);
         $this->parameters->setLongitude($longitude);
@@ -323,7 +378,7 @@ class PhpWeatherKit
     public function language($language)
     {
         if (empty($language)) {
-            throw new \RuntimeException("Error! Empty language parameter.", 1);
+            throw new ValidationException("Empty language parameter.");
         }
         $this->logger->debug("Setting language: " . $language);
         $this->parameters->setLanguage($language);
@@ -344,7 +399,7 @@ class PhpWeatherKit
     public function countryCode($country_code)
     {
         if (empty($country_code)) {
-            throw new \RuntimeException("Error! Empty country_code parameter.", 1);
+            throw new ValidationException("Empty country_code parameter.");
         }
 
         $this->logger->debug("Setting country code: " . $country_code);
@@ -390,7 +445,7 @@ class PhpWeatherKit
     public function timezone($timezone)
     {
         if (empty($timezone)) {
-            throw new \RuntimeException("Error! Empty timezone parameter.", 1);
+            throw new ValidationException("Empty timezone parameter.");
         }
         $this->logger->debug("Setting timezone: " . $timezone);
         $this->parameters->setTimeZone($timezone);
@@ -400,31 +455,47 @@ class PhpWeatherKit
 
 
     /**
-     * Creates the weather data Request from Parameters and returns the Weatherkit API response as a WeatherData object
+     * Requests the weather data for the current parameters and returns the response as a WeatherData object.
      *
      * @return \Oxy86\PhpWeatherKit\Weather\WeatherData
      *
-     * @throws \Exception on HTTP error
-     * @throws \Throwable on HTTP error in PHP >=7
+     * @throws ValidationException      when a request parameter is invalid (no request is made)
+     * @throws AuthenticationException  when WeatherKit rejects the developer token (401/403)
+     * @throws RateLimitException       when the rate limit/quota is exceeded (429)
+     * @throws ApiException             on any other HTTP error, network failure or unreadable response
      */
     public function getWeatherData()
     {
         $this->logger->debug("Validating the parameters...");
         $this->validator->validate($this->parameters);
 
-        $this->logger->debug("Creating new weather forecast request...");
-        $request = $this->request_factory->createForecastRequest($this->parameters);
+        $request = $this->request_factory->createForecastRequest($this->parameters, $this->token());
+        $this->logger->debug("Requesting weather data: " . $request->getUri());
 
-        $this->logger->debug("Making the request to Weatherkit API to obtain the weather data for this location...");
-        $response = $this->http_client->gzip()->request($request);
-
-        $this->logger->debug("Decoding API response...");
-        $data = json_decode($response->getBody(), true);
-
-        $this->logger->debug("Weather data size: " . count(array_keys($data)));
-        if (!empty($data) && is_array($data)) {
-            $this->logger->debug("Weather data keys: " . implode(', ', array_keys($data)));
+        try {
+            $response = $this->http_client->sendRequest($request);
+        } catch (ClientExceptionInterface $e) {
+            throw new ApiException('Request to the WeatherKit API failed: ' . $e->getMessage(), 0, null, $e);
         }
+
+        $status = $response->getStatusCode();
+        $body = (string) $response->getBody();
+        if ($status >= 400) {
+            $message = "WeatherKit API returned HTTP $status";
+            if ($status === 401 || $status === 403) {
+                throw new AuthenticationException("$message (authentication failed): $body", $status, $body);
+            }
+            if ($status === 429) {
+                throw new RateLimitException("$message (rate limit exceeded): $body", $status, $body);
+            }
+            throw new ApiException("$message: $body", $status, $body);
+        }
+
+        $data = json_decode($body, true);
+        if (!is_array($data)) {
+            throw new ApiException('The WeatherKit API returned an invalid response: ' . json_last_error_msg(), $status, $body);
+        }
+        $this->logger->debug("Weather data keys: " . implode(', ', array_keys($data)));
 
         return new WeatherData($data, $response->getHeaders());
     }
